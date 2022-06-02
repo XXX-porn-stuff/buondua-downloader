@@ -6,6 +6,7 @@ import threading
 import shutil
 import platform
 import re
+import traceback
 
 
 if platform.system() == 'Windows':
@@ -62,6 +63,10 @@ class Gui(tk.Frame):
 	def add_elements(self):
 		"""Draw GUI elements."""
 		self.output = tk.Text(self.col_left, width=50, height=30, wrap='word', state='disabled')
+		# Tags for update_output(text, TAG)
+		self.output.tag_configure('red', foreground='red')
+		self.output.tag_configure('blue', foreground='blue')
+
 		self.queue = tk.Text(self.col_right, width=30, height=30, wrap='none', state='disabled')
 		self.current_title = tk.Label(self.bot_left, text='Waiting..')
 		self.queue_progress = tk.Label(self.bot_right, text='0 / 0')
@@ -102,18 +107,19 @@ class Gui(tk.Frame):
 		self.set_queue_progress()
 		self.set_free_space()
 
-	def update_output(self, text):
+	def update_output(self, text, tag = ''):
 		"""Print out to view, mostly current progress.
 		View gets cleared every 10000 characters.
 		
 		Keyword arguments:
 		text -- value that gets appended to 'stdout'
+		tag -- optional tag value for changing colours of the output
 		"""
 		self.output.configure(state='normal')
 		if len(self.output.get('1.0', 'end')) >= 10000:
 			self.output.delete('1.0', 'end')
 			self.output.insert('end', 'Clearing the view..\n')
-		self.output.insert('end', text)
+		self.output.insert('end', text, tag)
 		self.output.see('end')
 		self.output.configure(state='disabled')
 
@@ -139,8 +145,8 @@ class Gui(tk.Frame):
 			and not clip_val.startswith('https://buondua.com/?start=')
 			and not clip_val.startswith('https://buondua.com/tag/')):
 				self.add_to_queue(clip_val)
-		except Exception as e:
-			print(e)
+		except Exception:
+			traceback.print_exc()
 
 	def add_to_queue(self, clip_val):
 		"""Add URL to queue list if it matches certain criteria:
@@ -243,18 +249,28 @@ class Gui(tk.Frame):
 					os.makedirs(dest_dir)
 					self.download_images(out, dest_dir, album_name)
 				else: # FIXME: maybe check for number of images rather than directory name to see if it exists
-					self.update_output('%s already exists.\n' % album_name)
+					self.update_output(album_name)
+					self.update_output(' already exists.\n', 'blue')
 					self.queue_list_head[self.queue_list_head.index(album_name)] = '%s ' % X_MARK + album_name
 					self.dusted += 1
 					del(self.queue_list[0])
 					self.update_gui()
 					self.is_downloading = False
-			except OSError as e:
-				print(f'OSError: {e}')
+			except OSError:
+				traceback.print_exc()
 				return
 
 		except Exception as e:
-			print(f'Error: {e}')
+			traceback.print_exc()
+			# Skip download if an exception occurs during link conversion
+			self.update_output('Error:', 'red')
+			self.update_output(f' {e}\nSkipping {album_name}.\n')
+			# Basically a copy of skipping if dir exists above
+			self.queue_list_head[self.queue_list_head.index(album_name)] = '%s ' % X_MARK + album_name
+			self.dusted += 1
+			del(self.queue_list[0])
+			self.update_gui()
+			self.is_downloading = False
 
 	def download_images(self, links, dest, header):
 		"""Start downloading images and update the 'stdout' as it progresses.
@@ -289,8 +305,8 @@ class Gui(tk.Frame):
 					time.sleep(add)
 					total_pauses += add
 
-			except Exception as e:
-				print(e)
+			except Exception:
+				traceback.print_exc()
 			finally:
 				continue
 
