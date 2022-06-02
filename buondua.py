@@ -7,19 +7,34 @@ import shutil
 import platform
 import re
 import traceback
+import webbrowser
+from tkinter import filedialog
 
 
+# config directory depending on OS
 if platform.system() == 'Windows':
+	BD_DIR = os.path.expanduser('~\\Documents\\buondua-downloader')
 	O_MARK = 'o'
 	X_MARK = 'x'
 else: # Darwin & Linux, far cuter
+	BD_DIR = os.path.expanduser('~/.config/buondua-downloader')
 	O_MARK = '✓'
 	X_MARK = '×'
 
-DWN_ROOT = 'albums' # TODO: a better, customisable place, possibly let user choose
-if not os.path.isdir(DWN_ROOT):
-	os.mkdir(DWN_ROOT)
-LOG = os.path.join(DWN_ROOT, 'buondua-downloader.log')
+DEF_DWNS = os.path.join(os.getcwd(), 'albums') # default dwns directory
+DWNS_DIR = DEF_DWNS # root dwns directory
+LOG = os.path.join(BD_DIR, 'buondua-downloader.log') # log file
+BD_CONF = os.path.join(BD_DIR, 'bd.conf') # config file
+CONF_BODY = '# path=path/to/downloads/dir\n# Tilde (~) could be used instead of absolute path to home.\npath=%s\n'
+
+# create config directory
+try:
+	if not os.path.isdir(BD_DIR):
+		os.mkdir(BD_DIR)
+		print('%s has been created.' % BD_DIR)
+except:
+	traceback.print_exc()
+
 # minimum wait time between downloads per image (seconds),
 # to prevent getting blocked from the website,
 # EDIT AT YOUR OWN RISK!
@@ -59,6 +74,12 @@ class Gui(tk.Frame):
 		self.add_elements()
 		self.set_free_space()
 		self.run_listener()
+
+		self.bind_all('<Control-q>', self.exit_func)
+
+	def exit_func(self, *args):
+		"""Menu and shortcut (ctrl-q) exit function."""
+		self.quit()
 
 	def add_elements(self):
 		"""Draw GUI elements."""
@@ -198,13 +219,22 @@ class Gui(tk.Frame):
 		"""Set label of remaining disk space in destination.
 		Gets called on every queue list change in update_gui().
 		"""
-		total, used, free = shutil.disk_usage(DWN_ROOT)
+		total, used, free = shutil.disk_usage(DWNS_DIR)
 		val = 'Free: %d GB' % (free // (2**30))
 		self.free_space.configure(text=val)
 
 	def explore(self):
 		"""Browse into the downloads directory in the explorer."""
-		os.startfile(DWN_ROOT)
+		os.startfile(DWNS_DIR)
+
+	def set_downloads_directory(self):
+		"""Set downloads directory for the galleries."""
+		selected_dir = filedialog.askdirectory()
+		global DWNS_DIR
+		if selected_dir:
+			DWNS_DIR = selected_dir
+			edit_config()
+			self.set_free_space()
 
 	# --- core --- #
 	def start(self, url):
@@ -243,7 +273,7 @@ class Gui(tk.Frame):
 			for x in range(1, album_size + 1):
 				out.append(link_template % x)
 
-			dest_dir = os.path.join(DWN_ROOT, album_name)
+			dest_dir = os.path.join(DWNS_DIR, album_name)
 			try:
 				if not os.path.exists(dest_dir):
 					os.makedirs(dest_dir)
@@ -349,6 +379,77 @@ def split_url_head(url):
 		split_url = split_url[:-1]
 	return split_url
 
+# --- config related --- #
+def create_config():
+	"""Create the config file if it doesn't exist with default values."""
+	try:
+		if not os.path.isdir(BD_DIR):
+			os.makedirs(BD_DIR)
+			print('%s has been created.' % BD_DIR)
+		if not os.path.isfile(BD_CONF):
+			with open(BD_CONF, 'w', encoding='utf8') as file:
+				file.write(CONF_BODY % DEF_DWNS)
+	except:
+		traceback.print_exc()
+
+def edit_config():
+	"""Update the config file with the user's selected options."""
+	try:
+		with open(BD_CONF, 'w', encoding='utf8') as file:
+			file.write(CONF_BODY % DWNS_DIR)
+	except:
+		traceback.print_exc()
+
+def get_config():
+	"""Get the config file and set the variables according to what's written in it."""
+	try:
+		if os.path.isfile(BD_CONF):
+			temp = list(filter(None, open(BD_CONF).read().split('\n')))
+			for line in temp:
+				if line.startswith('#'):
+					pass
+				else:
+					if line.startswith('path='):
+						return check_path(line)
+	except Exception:
+		traceback.print_exc()
+
+def check_path(line):
+	"""Sterilise path value read from config file in get_config().
+	Removing any leading or trailing whitespace, replace ~ with $HOME if starts with ~.
+	Create directory if it doesn't already exist.
+	
+	keyword args:
+	line -- line of string read from config file that has path information
+	"""
+	input_src = line.replace('path=', '', 1).strip()
+	if input_src == '':
+		return ''
+	input_src = if_home(input_src)
+	if os.path.isdir(input_src):
+		return input_src
+	else:
+		try:
+			os.makedirs(input_src)
+			return input_src
+		except:
+			traceback.print_exc()
+
+def if_home(val):
+	"""Return replacing ~ with $HOME value if starts with ~, return itself if not.
+	
+	keyword args:
+	val -- path string
+	"""
+	if val.startswith('~'):
+		return val.replace('~', os.path.expanduser('~'), 1)
+	return val
+	# --- config related end --- #
+
+def open_github():
+	"""Launch web browser and browse into the program's repo on GitHub."""
+	webbrowser.open_new('https://github.com/kittenparry/buondua-downloader')
+
 def get_geometry():
 	"""Return geometry to spawn the program in the middle of the screen.
 	Only in 1920px width.
@@ -360,10 +461,33 @@ def get_geometry():
 
 def start_gui():
 	"""Launch GUI."""
+
+	# Try to create initial config file
+	# Read values from it if it exists
+	create_config()
+	global DWNS_DIR
+	DWNS_DIR = get_config()
+
 	root = tk.Tk(className='buondua-downloader')
 	root.title('buondua-downloader')
 	root.geometry(get_geometry())
 	app = Gui(master=root)
+
+	menubar = tk.Menu(app)
+	file_menu = tk.Menu(menubar, tearoff=0)
+	file_menu.add_command(label='Exit', underline=0, command=app.exit_func, accelerator='Ctrl+Q')
+
+	edit_menu = tk.Menu(menubar, tearoff=0)
+	edit_menu.add_command(label='Set downloads directory...', command=app.set_downloads_directory)
+
+	about_menu = tk.Menu(menubar, tearoff=0)
+	about_menu.add_command(label='GitHub 🡕', underline=0, command=open_github)
+
+	menubar.add_cascade(label='File', menu=file_menu)
+	menubar.add_cascade(label='Edit', menu=edit_menu)
+	menubar.add_cascade(label='About', menu=about_menu)
+	root.config(menu=menubar)
+
 	app.mainloop()
 
 
