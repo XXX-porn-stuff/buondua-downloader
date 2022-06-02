@@ -65,6 +65,15 @@ class Gui(tk.Frame):
 		self.bot_sec_left.grid(row=2, column=0)
 		self.bot_sec_right.grid(row=2, column=1)
 
+		# Theming
+		self.colour_scheme('dark') # TODO: maybe a switch option between the two
+		master.configure(bg=self.bg)
+
+		# set frame backgrounds
+		frames = [self.col_left, self.col_right, self.bot_left, self.bot_right, self.bot_sec_left, self.bot_sec_right]
+		for frame in frames:
+			frame.configure(bg=self.bg)
+
 		self.queue_list = []      # list of URLS
 		self.queue_list_head = [] # header, titles only
 		self.is_downloading = False
@@ -77,18 +86,29 @@ class Gui(tk.Frame):
 
 		self.bind_all('<Control-q>', self.exit_func)
 
+	def colour_scheme(self, mode):
+		"""Define colour scheming for the whole program.
+		
+		Keyword arguments:
+		mode -- selection of dark/light colouring for the program. only dark for now.
+		"""
+		if mode == 'dark':
+			self.bg, self.fg, self.ac1, self.ac2 = ('#282828', '#CAD2C5', '#404040', '#B3B3B3')
+		if mode == 'light':
+			self.bg, self.fg, self.ac1, self.ac2 = ('#FBF8F1', 'black', '#F7ECDE', '#E9DAC1')
+
 	def exit_func(self, *args):
 		"""Menu and shortcut (ctrl-q) exit function."""
 		self.quit()
 
 	def add_elements(self):
 		"""Draw GUI elements."""
-		self.output = tk.Text(self.col_left, width=50, height=30, wrap='word', state='disabled')
+		self.output = tk.Text(self.col_left, width=50, height=30, wrap='word', state='disabled', cursor='arrow')
 		# Tags for update_output(text, TAG)
-		self.output.tag_configure('red', foreground='red')
-		self.output.tag_configure('blue', foreground='blue')
+		self.output.tag_configure('red', foreground='#F47C7C')
+		self.output.tag_configure('blue', foreground='#8CC0DE')
 
-		self.queue = tk.Text(self.col_right, width=30, height=30, wrap='none', state='disabled')
+		self.queue = tk.Text(self.col_right, width=30, height=30, wrap='none', state='disabled', cursor='arrow')
 		self.current_title = tk.Label(self.bot_left, text='Waiting..')
 		self.queue_progress = tk.Label(self.bot_right, text='0 / 0')
 		self.free_space = tk.Label(self.bot_sec_left, text='Free: 0 GB')
@@ -104,14 +124,18 @@ class Gui(tk.Frame):
 			self.free_space, self.xo_progress]
 		# FIXME: currently only browsing for Windows
 		if platform.system() == 'Windows':
-			self.files_btn = tk.Button(self.bot_sec_left, text='Galleries', command=self.explore)
+			self.files_btn = tk.Button(self.bot_sec_left, text='Galleries', command=self.explore, activebackground=self.ac1, activeforeground=self.ac2, cursor='hand2')
 			self.elements.append(self.files_btn)
 		self.scrolls = [self.scroll_output, self.scroll_queue]
 
 		for el in self.elements:
 			el.pack(side='left', pady=2, padx=1)
-		for sc in self.scrolls:
-			sc.pack(side='left', fill='y')
+			el.configure(bg=self.bg, fg=self.fg, borderwidth=0)
+		self.output.configure(bg=self.ac1)
+		self.queue.configure(bg=self.ac1)
+		# for sc in self.scrolls:
+		# 	sc.pack(side='left', fill='y')
+		# 	sc.pack_forget()
 
 	def run_listener(self):
 		"""Header function for periodic calls, gets recalled every 1s."""
@@ -454,10 +478,10 @@ def get_geometry():
 	"""Return geometry to spawn the program in the middle of the screen.
 	Only in 1920px width.
 	"""
-	program_width = 690
+	program_width = 650
 	screen_width = 1920
 	x_position = (screen_width - program_width) / 2
-	return '%dx550+%d+30' % (program_width, x_position)
+	return '%dx535+%d+30' % (program_width, x_position)
 
 def start_gui():
 	"""Launch GUI."""
