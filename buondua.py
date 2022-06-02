@@ -481,7 +481,7 @@ def get_geometry():
 	program_width = 650
 	screen_width = 1920
 	x_position = (screen_width - program_width) / 2
-	return '%dx535+%d+30' % (program_width, x_position)
+	return '%dx555+%d+30' % (program_width, x_position)
 
 def start_gui():
 	"""Launch GUI."""
@@ -495,6 +495,10 @@ def start_gui():
 	root = tk.Tk(className='buondua-downloader')
 	root.title('buondua-downloader')
 	root.geometry(get_geometry())
+	try:
+		root.iconbitmap('icon.ico')
+	except:
+		pass
 	app = Gui(master=root)
 
 	menubar = tk.Menu(app)
